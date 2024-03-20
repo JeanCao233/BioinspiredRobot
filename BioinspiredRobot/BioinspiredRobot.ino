@@ -1,4 +1,5 @@
 # include <Stepper.h>
+# include "filters.h"
 
 // Simulated temperature sensor value
 int temperature = 25;
