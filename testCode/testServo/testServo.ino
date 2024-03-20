@@ -12,7 +12,6 @@ void setup() {
   myservo2.attach(10);  // attaches the servo on pin 9 to the servo object
   Serial.println("Starting");
 
-
 }
 
 void loop() {

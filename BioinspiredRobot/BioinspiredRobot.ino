@@ -1,29 +1,34 @@
 # include <Stepper.h>
 # include "filters.h"
 
-// Simulated temperature sensor value
-int temperature = 25;
-char incomingByte = "not specified";
-int val = 0;
+// Parameters for filter
+const float cutoff_freq   = 20.0;  //Cutoff frequency in Hz
+const float sampling_time = 0.005; //Sampling time in seconds.
+IIR::ORDER  order  = IIR::ORDER::OD3; // Order (OD1 to OD4)
+    
+// Creating a low-pass filter class
+Filter f(cutoff_freq, sampling_time, order);
 
 void setup() {
   // Start serial communication
   Serial.begin(19200);
+
+  // Setting up sensor filters
+  pinMode(A0, INPUT);
+  // Enable pull-ups if necessary
+  digitalWrite(A0, HIGH);
+
 }
 
 void loop() {
-  // Simulate temperature reading
-  temperature = random(20, 30); // Random temperature between 20 and 30
+  int value = analogRead(0);
 
-  // Print temperature reading to Serial Monitor
-  //Serial.print("Temperature: ");
-  //Serial.print(temperature);
-  //Serial.println(" C");
-  //incomingByte = Serial.read();
-  //val = atoi(&incomingByte);
-  //Serial.println(val);
+  // Filtering input signal
+  float filteredval = f.filterIn(value);
   
-
-  // Delay for demonstration purposes
-  delay(1000);
+  //View with Serial Plotter
+  Serial.print(value, DEC);
+  Serial.print(",");
+  Serial.println(filteredval, 4);
+  delay(5); // Loop time will approx. match the sampling time.
 }
