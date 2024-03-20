@@ -1,6 +1,7 @@
 // (c) Michael Schoeffler 2017, http://www.mschoeffler.de
 
 #include "Wire.h" // This library allows you to communicate with I2C devices.
+#include "filters.h"
 
 const int MPU_ADDR = 0x68; // I2C address of the MPU-6050. If AD0 pin is set to HIGH, the I2C address will be 0x69.
 
@@ -15,6 +16,15 @@ char* convert_int16_to_str(int16_t i) { // converts int16 to string. Moreover, r
   return tmp_str;
 }
 
+// Parameters for filter
+const float cutoff_freq   = 20.0;  //Cutoff frequency in Hz
+const float sampling_time = 0.005; //Sampling time in seconds.
+IIR::ORDER  order  = IIR::ORDER::OD3; // Order (OD1 to OD4)
+    
+// Creating a low-pass filter class
+Filter f(cutoff_freq, sampling_time, order);
+
+
 void setup() {
   Serial.begin(9600);
   Wire.begin();
@@ -22,7 +32,14 @@ void setup() {
   Wire.write(0x6B); // PWR_MGMT_1 register
   Wire.write(0); // set to zero (wakes up the MPU-6050)
   Wire.endTransmission(true);
+  
+  // Setting up sensor filters
+  pinMode(A0, INPUT);
+  // Enable pull-ups if necessary
+  digitalWrite(A0, HIGH);
+
 }
+
 void loop() {
   Wire.beginTransmission(MPU_ADDR);
   Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H) [MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2, p.40]
@@ -48,6 +65,15 @@ void loop() {
   Serial.print(" | gY = "); Serial.print(convert_int16_to_str(gyro_y));
   Serial.print(" | gZ = "); Serial.print(convert_int16_to_str(gyro_z));
   Serial.println();
+
+  // Filtering input signal
+  float filtered_gX = f.filterIn(gyro_x);
+  float filtered_gY = f.filterIn(gyro_y);
+  float filtered_gZ = f.filterIn(gyro_z);
+  // print out filtered data
+  Serial.print(" | filtered_gX = "); Serial.print(filtered_gX);
+  Serial.print(" | filtered_gY = "); Serial.print(filtered_gY);
+  Serial.print(" | filtered_gZ = "); Serial.print(filtered_gZ);
   
   // delay
   delay(1000);
