@@ -59,7 +59,7 @@ void setup() {
   // Enable pull-ups if necessary
   digitalWrite(A0, HIGH);
 
-  filter.begin(10);
+  filter.begin(cutoff_freq);
 
 }
 
@@ -95,9 +95,10 @@ void loop() {
   prev_yaw = yaw;
 
   // Calculate linear acceleration without gravity
-  float accelWithoutGravityX = f_ax_.filterIn(accelX - (-sin(pitch/180.0*PI)))*(-9.81);
-  float accelWithoutGravityY = f_ay_.filterIn(accelY - (sin(roll/180.0*PI) * cos(pitch/180.0*PI)))*(-9.81);
-  float accelWithoutGravityZ = f_az_.filterIn(accelZ - (cos(roll/180.0*PI) * cos(pitch/180.0*PI)))*(-9.81);
+  // The additional low pass filter may be redundent
+  float accelWithoutGravityX = (accelX - (-sin(pitch/180.0*PI)))*(-9.81);
+  float accelWithoutGravityY = (accelY - (sin(roll/180.0*PI) * cos(pitch/180.0*PI)))*(-9.81);
+  float accelWithoutGravityZ = (accelZ - (cos(roll/180.0*PI) * cos(pitch/180.0*PI)))*(-9.81);
   
   
   // print filtered data

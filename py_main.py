@@ -190,6 +190,10 @@ def runEKFtest():
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_zlabel('Z')
+    ax1.set_xlim(-0.5, 0.5)
+    ax1.set_ylim(-0.5, 0.5)
+    ax1.set_zlim(-0.5, 0.5)
+    ax1.set_aspect('equal', adjustable='box')
 
     stop = timeit.default_timer()
     print('Time: ', stop - start)
@@ -201,14 +205,14 @@ if __name__ == '__main__':
     """
     Read from serial
     """
-    #create_log()
+    create_log()
 
     """
     Calculate step displacement
     """
-    #x, y, z = calcD_fromLog('sensor_data.log', sampling_freq=10)
+    x, y, z = calcD_fromLog('sensor_data.log', sampling_freq=10)
 
     """
     Run EKF test on randomly generated test
     """
-    runEKFtest()
+    #runEKFtest()
