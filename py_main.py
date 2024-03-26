@@ -34,7 +34,7 @@ while True:
 def create_log():
     # Configure logging
     logging.basicConfig(filename='serial.log', level=logging.INFO, format='%(asctime)s - %(message)s')
-    arduino = serial.Serial(port='/dev/cu.usbmodem1101',   baudrate=9600, timeout=.1)
+    arduino = serial.Serial(port='/dev/cu.usbmodem101',   baudrate=115200, timeout=.1)
 
     with open('sensor_data.log', 'w') as log_file:
         try:
@@ -64,11 +64,48 @@ def create_log():
         except KeyboardInterrupt:
             arduino.close()
 
+def plotData(datafile, sampling_freq=10):
+    imu_data = np.genfromtxt(datafile, delimiter=' ')
+    ax = imu_data[:, 0]
+    ay = imu_data[:, 1]
+    az = imu_data[:, 2]
+    
+    l = len(ax)
+    dt = 1.0 / sampling_freq
+    t = np.arange(0, dt*l, dt)
+    print(np.shape(t))
+
+    plt.figure(figsize=(10, 6))
+    plt.title('Accelerations')
+    plt.xlabel('x')
+    plt.ylabel('y')
+
+    # Plot the curves
+    plt.plot(t, ax, label='ax')
+    plt.plot(t, ay, label='ay')
+    plt.plot(t, az, label='az')
+
+    plt.legend()
+    plt.show()
+    
+def calcMean(datafile):
+    imu_data = np.genfromtxt(datafile, delimiter=' ')
+
+    ax = imu_data[:, 0]
+    ay = imu_data[:, 1]
+    az = imu_data[:, 2]
+
+    ax_mean = np.mean(ax)
+    ay_mean = np.mean(ay)
+    az_mean = np.mean(az)
+
+    return ax_mean, ay_mean, az_mean
+
 
 def calcD_fromLog(datafile, sampling_freq):
     sampling_frequency = 100
 
-    dt = 1.0 / sampling_frequency
+    dt = 1.0 / sampling_freq
 
     # read file with ax, ay, az, wx, wy, wz measurements from IMU
     imu_data = np.genfromtxt(datafile, delimiter=' ')
@@ -76,6 +113,13 @@ def calcD_fromLog(datafile, sampling_freq):
     ax = imu_data[:, 0]
     ay = imu_data[:, 1]
     az = imu_data[:, 2]
+
+    ax_mean, ay_mean, az_mean = calcMean(datafile)
+    print(ax_mean, ay_mean, az_mean)
+
+    ax = ax - ax_mean
+    ay = ay - ay_mean
+    ax = az - az_mean
 
     l = len(ax)
     vx = np.zeros(l - 1)
@@ -205,12 +249,13 @@ if __name__ == '__main__':
     """
     Read from serial
     """
-    create_log()
+    #create_log()
+    #plotData('sensor_data.log')
 
     """
     Calculate step displacement
     """
-    x, y, z = calcD_fromLog('sensor_data.log', sampling_freq=10)
+    x, y, z = calcD_fromLog('sensor_data.log', sampling_freq=100)
 
     """
     Run EKF test on randomly generated test
