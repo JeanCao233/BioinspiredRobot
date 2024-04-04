@@ -35,7 +35,6 @@ void setup(void) {
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
 
   //Serial.println("Adafruit LSM6DSOX test!");
-
   if (!sox.begin_I2C()) {
     // if (!sox.begin_SPI(LSM_CS)) {
     // if (!sox.begin_SPI(LSM_CS, LSM_SCK, LSM_MISO, LSM_MOSI)) {
