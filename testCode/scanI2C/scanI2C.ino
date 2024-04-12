@@ -1,3 +1,6 @@
+#include <WireIMXRT.h>
+#include <WireKinetis.h>
+
 // --------------------------------------
 // i2c_scanner
 //
@@ -27,12 +30,18 @@
 // Devices with higher bit address might not be seen properly.
 //
  
-#include <Wire.h>
- 
+//#include <Wire.h>
+#include <Wire10.h>
  
 void setup()
 {
+  //pinMode(16, INPUT); 
+  //pinMode(17, INPUT);
   Wire.begin();
+  //Wire1.setSCL(16);
+  //Wire1.setSDA(17);
+  //Wire1.begin(0x18);
+  
  
   Serial.begin(9600);
   while (!Serial);             // Leonardo: wait for serial monitor
@@ -44,6 +53,12 @@ void loop()
 {
   byte error, address;
   int nDevices;
+  Wire1.beginTransmission( 0x18 );
+  //Wire1->write( 0x35 );
+  Wire1.endTransmission();
+  Wire1.requestFrom( 0x18, 1 );
+  float shift = Wire1.read();
+  Serial.println(shift);
  
   Serial.println("Scanning...");
  

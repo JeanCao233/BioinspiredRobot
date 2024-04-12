@@ -133,10 +133,12 @@ class EKF_SLAM():
             mi_y = x[i*3 + 7, ]
             mi_z = x[i*3 + 8, ]
             xk = np.array([X, Y, Z, alpha, beta, gamma, mi_x, mi_y, mi_z])
+            #print(xk)
             y[i, ] = self.distance(xk, self.V[i, i])
-            y[i+l, ] = self.x_angle(xk, self.V[i+l, i+l])
-            y[i+2*l, ] = self.y_angle(xk, self.V[i+2*l, i+2*l])
-            y[i+3*l, ] = self.z_angle(xk, self.V[i+3*l, i+3*l])
+            #print(y)
+            #y[i+l, ] = self.x_angle(xk, self.V[i+l, i+l])
+            #y[i+2*l, ] = self.y_angle(xk, self.V[i+2*l, i+2*l])
+            #y[i+3*l, ] = self.z_angle(xk, self.V[i+3*l, i+3*l])
         return y
 
     # TODO: complete the function below
@@ -226,6 +228,7 @@ class EKF_SLAM():
         #***************** Predict step *****************#
         # predict the state
         self.mu = self._f(self.mu, u)
+        #print("Predicted mu : ", self.mu)
         self.mu[3:6] =  self._wrap_to_pi(self.mu[3:6])
 
         # predict the error covariance
@@ -240,6 +243,7 @@ class EKF_SLAM():
 
         # update estimation with new measurement
         diff = y - self._h(self.mu)
+        #print("Diff : ", diff)
         diff[self.n:] = self._wrap_to_pi(diff[self.n:])
         self.mu = self.mu + L @ diff
         self.mu[3:6] =  self._wrap_to_pi(self.mu[3:6])
@@ -255,12 +259,7 @@ class EKF_SLAM():
         return angle
 
 
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    import timeit
-    import serial
-
+def runEKFtest():
     start = timeit.default_timer()
     
     m3d = np.array([[0.,  0.,  0.],
@@ -347,3 +346,86 @@ if __name__ == '__main__':
 
     plt.show()
 
+def runEKF(imu_readings, magnetometer_readings, sampling_freq):
+    import matplotlib.pyplot as plt
+    m3d = np.array([[0.,  0.2,  0.]]).reshape(-1)
+
+    dt = 1.0 / sampling_freq
+
+    r, _ = np.shape(imu_readings)
+    T = np.arange(0, (r+1)//sampling_freq - 1, dt)
+    n = int(len(m3d)/3)
+    W = np.zeros((6+3*n, 6+3*n))                                                # process noise covariance. xyz + rpy + 3m
+    W[0:6, 0:6] = np.eye(6)*0.0005
+    W[6: , 6: ] = np.eye(3)*0.0001    # unsure if include
+    V = np.eye(4*n)*0.001                                                          # measurement covariance
+    V[n:,n:] = np.eye(3*n)*0                                  
+    print(W)
+    print(V)
+
+    # EKF estimation
+    mu_ekf = np.zeros((6+3*n, len(T)))
+    mu_ekf[0:6,0] = np.array([0, 0, 0, 0, 0, 0])
+    # mu_ekf[3:,0] = m + 0.1
+    mu_ekf[6:,0] = np.array([0, 0.2, 0])
+    init_P = 1*np.eye(6+3*n)                                                    #covariance of initial state
+
+    # initialize EKF SLAM
+    slam = EKF_SLAM(mu_ekf[:,0], init_P, dt, W, V, n)
+    
+    # real state
+    #mu = np.zeros((6+3*n, len(T)))
+    #mu[0:6,0] = np.array([0, 0, 0, 0, 0, 0])
+    #mu[6:,0] = np.array([0.2, 0, 0])
+
+    y_hist = np.zeros((4*n, len(T)))
+
+    for i, t in enumerate(T):
+        if i > 0:
+            # real dynamics
+            #u = [-10*t, 0, 0, 0, 0, 0]
+            #imu_u = imu_readings[i]
+            imu_u = imu_readings[i]
+            # u = [0.5, 0.5*np.sin(t*0.5), 0]
+            # u = [0.5, 0.5, 0]
+            #mu[:,i] = slam._f(mu[:,i-1], imu_u)
+            
+            # measurements
+            y = magnetometer_readings[i]                                        # [dist, x_angle, y_angle, z_angle]
+            #y = slam._h(mu[:,i]) + np.random.multivariate_normal(np.zeros(4*n), V)*0.01
+
+            y_hist[:,i] = (y-slam._h(slam.mu))
+
+            # apply EKF SLAM
+            mu_est, _ = slam.predict_and_correct(y, imu_u)
+            mu_ekf[:,i] = mu_est
+
+            #print("True      X, Y, psi:", mu[0:3,i])
+            #print("Estimated X, Y, psi:", mu_est[0], mu_est[1], mu_est[2])
+            #print("-------------------------------------------------------")
+            
+            #if i == 50: break
+    #print(mu)
+    #print(mu_ekf)
+
+    fig = plt.figure(1)
+    plt.clf()
+    ax1 = plt.subplot(aspect='equal', projection='3d')
+    #ax1.plot(mu[0,:], mu[1,:], mu[2,:], 'b')
+    ax1.plot(mu_ekf[0,:], mu_ekf[1,:], mu_ekf[2,:], 'r--')
+    mf = m3d.reshape((-1,3))
+    ax1.scatter(mf[:,0], mf[:,1], mf[:,2])
+    ax1.scatter(mu_ekf[0,0], mu_ekf[1,0], mu_ekf[2,0])
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_zlabel('Z')
+
+    plt.show()
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    import timeit
+    import serial
+
+    #runEKFtest()
+    

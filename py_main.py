@@ -7,7 +7,8 @@ import binascii
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
-from EKF3d import EKF_SLAM
+from EKF3d import EKF_SLAM, runEKFtest, runEKF
+from mag_calcs import calc_mag_disp
 
 
 ports = list(serial.tools.list_ports.comports())
@@ -34,16 +35,19 @@ while True:
 def calc_rpy(imu_data, mag_data):
     roll = np.arctan2(-imu_data[0], np.sqrt((imu_data[1] * imu_data[1]) + (imu_data[2] * imu_data[2])))
     pitch = np.arctan2(imu_data[1], np.sqrt((imu_data[0] * imu_data[0]) + (imu_data[2] * imu_data[2])))
+    #roll = np.arctan2(imu_data[1], imu_data[2])
+    #pitch = np.arctan2(-imu_data[0], np.sqrt((imu_data[1] * imu_data[1]) + (imu_data[2] * imu_data[2])))
 
     Xh = (mag_data[0] * np.cos(pitch)) + (mag_data[1] * np.sin(roll) * np.sin(pitch)) + (mag_data[2] * np.cos(roll) * np.sin(pitch))
     Yh = (mag_data[1] * np.cos(roll)) - (mag_data[2] * np.sin(roll))
 
     yaw = np.arctan2(Yh, Xh)
+    #yaw = np.arctan2(mag_data[1], mag_data[0])
 
     return np.array([roll, pitch , yaw])
 
 def calc_accel_without_g(accel_data, rpy):
-    gravity = np.array([0, 0, 9.81])
+    gravity = np.array([0, 0, -9.81])
 
     # Apply rotation to gravity vector
     r = R.from_euler('zyx', [rpy[2], rpy[0], rpy[1]], degrees=False)
@@ -51,8 +55,8 @@ def calc_accel_without_g(accel_data, rpy):
 
     # Subtract gravity from accelerometer readings
     acc_without_gravity = np.zeros(3)
-    acc_without_gravity[0:2] = accel_data[0:2] + gravity_body[0:2]
-    acc_without_gravity[2] = accel_data[2] - gravity_body[2]
+    acc_without_gravity[0:2] = accel_data[0:2] - gravity_body[0:2]
+    acc_without_gravity[2] = accel_data[2] + gravity_body[2]
     #print(accel_data, gravity_body, rpy)
     return acc_without_gravity
 
@@ -60,7 +64,7 @@ def clear_data_offset(start_time, end_time):
     print("Starting calibration")
     # Configure logging
     logging.basicConfig(filename='serial.log', level=logging.INFO, format='%(asctime)s - %(message)s')
-    arduino = serial.Serial(port='/dev/cu.usbmodem101',   baudrate=19200, timeout=.1)
+    arduino = serial.Serial(port='/dev/cu.usbmodem152557701',   baudrate=19200, timeout=.1)
 
     with open('initial_data_offset.log', 'w') as log_file:
         try:
@@ -82,6 +86,7 @@ def clear_data_offset(start_time, end_time):
                     continue
 
                 # Write data to log file
+                print(data)
                 accel_data = np.array([float(values[0]), float(values[1]), float(values[2])])
                 mag_data = np.array([float(values[6]), float(values[7]), float(values[8])])
                 rpy = calc_rpy(accel_data, mag_data)
@@ -100,11 +105,12 @@ def print_cali_data(mean_vals, start_time, end_time):
     odom_meas = np.array([[0, 0, 0, 0, 0, 0]])
     # Configure logging
     logging.basicConfig(filename='serial.log', level=logging.INFO, format='%(asctime)s - %(message)s')
-    arduino = serial.Serial(port='/dev/cu.usbmodem101',   baudrate=19200, timeout=.1)
+    arduino = serial.Serial(port='/dev/cu.usbmodem152557701',   baudrate=19200, timeout=.1)
 
-    with open('sensor_data.log', 'r') as log_file:
+    with open('data_log.log', 'w') as log_file:
         try:
             while time.time() < start_time+end_time:
+            #while True:
                 #print(time.time())
                 try:
                     # Read data from serial port
@@ -129,13 +135,21 @@ def print_cali_data(mean_vals, start_time, end_time):
                 # Print data to console (optional)
                 imu_data = np.array([float(values[0]), float(values[1]), float(values[2])])
                 mag_data = np.array([float(values[6]), float(values[7]), float(values[8])]) - mean_vals[6:9]
+
                 rpy = calc_rpy(imu_data, mag_data)
                 accels = calc_accel_without_g(imu_data, rpy) - mean_vals[0:3]
-                odom_meas_i = np.hstack((accels, mag_data))
-                odom_meas = np.append(odom_meas, np.array([odom_meas_i]), axis=0)
-                #print(f"{float(accels[0]):.5f} {float(accels[1]):.5f} {float(accels[2]):.5f}\
-                #        {float(rpy[0])-mean_vals[3]:.5f} {float(rpy[1])-mean_vals[3]:.5f} {float(rpy[2])-mean_vals[3]:.5f}\
-                #        {float(mag_data[0]):.5f} {float(mag_data[1]):.5f} {float(mag_data[2]):.5f}\n")
+                dist, alpha, beta, theta = calc_mag_disp(mag_data)
+                
+                #odom_meas_i = np.hstack((accels, mag_data))
+                #odom_meas_i = np.hstack((accels, np.array([dist, 0, 0])))
+
+                #odom_meas = np.append(odom_meas, np.array([odom_meas_i]), axis=0)
+                log_file.write(f"{float(accels[0]):.5f} {float(accels[1]):.5f} {float(accels[2]):.5f} {float(rpy[0])-mean_vals[3]:.5f} {float(rpy[1])-mean_vals[3]:.5f} {float(rpy[2])-mean_vals[3]:.5f} {float(dist):.5f} {float(alpha):.5f} {float(beta):.5f}\n")
+                log_file.flush()  # Flush buffer to ensure data is written immediately
+                
+                print(f"{float(accels[0]):.5f} {float(accels[1]):.5f} {float(accels[2]):.5f}\
+                        {float(rpy[0])-mean_vals[3]:.5f} {float(rpy[1])-mean_vals[3]:.5f} {float(rpy[2])-mean_vals[3]:.5f}\
+                        {float(dist):.5f} {float(alpha):.5f} {float(beta):.5f}\n")
         except KeyboardInterrupt:
             arduino.close()
     return odom_meas
@@ -143,7 +157,7 @@ def print_cali_data(mean_vals, start_time, end_time):
 def log_processed_data():
     # Configure logging
     logging.basicConfig(filename='serial.log', level=logging.INFO, format='%(asctime)s - %(message)s')
-    arduino = serial.Serial(port='/dev/cu.usbmodem101',   baudrate=115200, timeout=.1)
+    arduino = serial.Serial(port='/dev/cu.usbmodem152557701',   baudrate=115200, timeout=.1)
 
     with open('sensor_data.log', 'w') as log_file:
         try:
@@ -197,8 +211,9 @@ def plot_processed_data(datafile, sampling_freq=10):
     plt.legend()
     plt.show()
     
-def calc_mean(datafile):
-    data = np.genfromtxt(datafile, delimiter=' ')
+def calc_mean(data):
+    if isinstance(data, str):
+        data = np.genfromtxt(data, delimiter=' ')
 
     ax = data[:, 0]
     ay = data[:, 1]
@@ -206,9 +221,6 @@ def calc_mean(datafile):
     gx = data[:, 3]
     gy = data[:, 4]
     gz = data[:, 5]
-    mx = data[:, 6]
-    my = data[:, 7]
-    mz = data[:, 8]
 
     ax_mean = np.mean(ax)
     ay_mean = np.mean(ay)
@@ -216,16 +228,21 @@ def calc_mean(datafile):
     gx_mean = np.mean(gx)
     gy_mean = np.mean(gy)
     gz_mean = np.mean(gz)
-    mx_mean = np.mean(mx)
-    my_mean = np.mean(my)
-    mz_mean = np.mean(mz)
 
-    return np.array([ax_mean, ay_mean, az_mean, gx_mean, gy_mean, gz_mean, mx_mean, my_mean, mz_mean])
+    if len(data[0]) > 6:
+        mx = data[:, 6]
+        my = data[:, 7]
+        mz = data[:, 8]
 
+        mx_mean = np.mean(mx)
+        my_mean = np.mean(my)
+        mz_mean = np.mean(mz)
+        return np.array([ax_mean, ay_mean, az_mean, gx_mean, gy_mean, gz_mean, mx_mean, my_mean, mz_mean])
+
+    return np.array([ax_mean, ay_mean, az_mean, gx_mean, gy_mean, gz_mean])
 
 
 def calcD_fromLog(datafile, sampling_freq):
-    sampling_frequency = 100
 
     dt = 1.0 / sampling_freq
 
@@ -236,7 +253,7 @@ def calcD_fromLog(datafile, sampling_freq):
     ay = imu_data[:, 1]
     az = imu_data[:, 2]
 
-    ax_mean, ay_mean, az_mean = calc_mean(datafile)
+    ax_mean, ay_mean, az_mean = calc_mean(datafile)[0:3]
     print(ax_mean, ay_mean, az_mean)
 
     ax = ax - ax_mean
@@ -244,13 +261,17 @@ def calcD_fromLog(datafile, sampling_freq):
     ax = az - az_mean
 
     l = len(ax)
-    vx = np.zeros(l - 1)
-    vy = np.zeros(l - 1)
-    vz = np.zeros(l - 1)
+    dvx = np.zeros(l - 1)
+    dvy = np.zeros(l - 1)
+    dvz = np.zeros(l - 1)
+    v = np.zeros((l, 3))
     for i1 in range(l - 1):
-        vx[i1] = (ax[i1+1] + ax[i1])*dt/2
-        vy[i1] = (ay[i1+1] + ay[i1])*dt/2
-        vz[i1] = (az[i1+1] + az[i1])*dt/2
+        dvx[i1] = (ax[i1+1] + ax[i1])*dt/2
+        dvy[i1] = (ay[i1+1] + ay[i1])*dt/2
+        dvz[i1] = (az[i1+1] + az[i1])*dt/2
+        v[i1+1, 0] = v[i1, 0] + dvx[i1]
+        v[i1+1, 1] = v[i1, 1] + dvy[i1]
+        v[i1+1, 2] = v[i1, 2] + dvz[i1]
     
     dx = np.zeros(l - 2)
     dy = np.zeros(l - 2)
@@ -259,199 +280,85 @@ def calcD_fromLog(datafile, sampling_freq):
     y = np.zeros(l - 1)
     z = np.zeros(l - 1)
     for i2 in range(l - 2):
-        dx[i2] = (vx[i2+1] + vx[i2])*dt/2
-        dy[i2] = (vy[i2+1] + vy[i2])*dt/2
-        dz[i2] = (vz[i2+1] + vz[i2])*dt/2
+        dx[i2] = (v[i2+1, 0] + v[i2, 0])*dt/2
+        dy[i2] = (v[i2+1, 1] + v[i2, 1])*dt/2
+        dz[i2] = (v[i2+1, 2] + v[i2, 2])*dt/2
         x[i2+1] = x[i2] + dx[i2]
         y[i2+1] = y[i2] + dy[i2]
         z[i2+1] = z[i2] + dz[i2]
-    
+    #z = z*0
     fig = plt.figure(1)
     ax1 = plt.subplot(aspect='equal', projection='3d')
     ax1.plot(x, y, z, 'b--')
+    ax1.scatter(x[0], y[0], z[0])
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_zlabel('Z')
-    plt.show()
-    return x, y, z
-
-def runEKFtest():
-    start = timeit.default_timer()
+    #plt.show()
+    ans = np.hstack((x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)))
+    #ans = np.vstack((np.array([[0, 0, 0]]), ans))
+    np.savetxt("displacements.txt", ans)
+    #print(v)
     
-    m3d = np.array([[0.,  0.,  0.],
-                    [0.,  20., 10.],
-                    [-10., 100.,  -10.],
-                    [20., 200.,  70.],
-                    [0,  -200,  -20.],
-                    [-20, 0,  30.],
-                    [10, -70, -70.],
-                    [-50, -100, -60.]]).reshape(-1)
-    
-    '''
-    minX, maxX, minY, maxY = -120., 450., -500., 50.
-    map_x = np.linspace(minX, maxX, 7)
-    map_y = np.linspace(minY, maxY, 7)
-    map_X, map_Y = np.meshgrid(map_x, map_y)
-    map_X = map_X.reshape(-1,1)
-    map_Y = map_Y.reshape(-1,1)
-    m = np.hstack((map_X, map_Y)).reshape((-1))
-    '''
+    return ans
 
-    dt = 0.01
-    T = np.arange(0, 10, dt)
-    n = int(len(m3d)/3)
-    W = np.zeros((6+3*n, 6+3*n))                    #xyz + rpy + 3m
-    W[0:6, 0:6] = dt**2 * 1 * np.eye(6)
-    V = 0.1*np.eye(4*n)
-    V[n:,n:] = 0.01*np.eye(3*n)                     #distance*n, theta*n, beta*n, gamma*n
-
-    # EKF estimation
-    mu_ekf = np.zeros((6+3*n, len(T)))
-    mu_ekf[0:6,0] = np.array([-20.2, -221.8, -52.1, 0.1, 0.2, -0.1])
-    # mu_ekf[3:,0] = m + 0.1
-    mu_ekf[6:,0] = m3d + np.random.multivariate_normal(np.zeros(3*n), 0.5*np.eye(3*n))
-    init_P = 1*np.eye(6+3*n)
-
-    # initialize EKF SLAM
-    slam = EKF_SLAM(mu_ekf[:,0], init_P, dt, W, V, n)
-    
-    # real state
-    mu = np.zeros((6+3*n, len(T)))
-    mu[0:6,0] = np.array([-20, -220, -50, 0, 0, 0])
-    mu[6:,0] = m3d
-
-    y_hist = np.zeros((4*n, len(T)))
-
-    for i, t in enumerate(T):
-        if i > 0:
-            # real dynamics
-            u = [-50*np.cos(t*3), 50, -100*np.sin(t*3), 1*np.sin(t*3), 1*np.sin(t*3), 1*np.sin(t*3)]
-            # u = [0.5, 0.5*np.sin(t*0.5), 0]
-            # u = [0.5, 0.5, 0]
-            mu[:,i] = slam._f(mu[:,i-1], u) + \
-                np.random.multivariate_normal(np.zeros(6+3*n), W)
-            
-            # measurements
-            y = slam._h(mu[:,i]) + np.random.multivariate_normal(np.zeros(4*n), V)
-
-            y_hist[:,i] = (y-slam._h(slam.mu))
-
-            # apply EKF SLAM
-            mu_est, _ = slam.predict_and_correct(y, u)
-            mu_ekf[:,i] = mu_est
-
-            #print("True      X, Y, psi:", mu[0:3,i])
-            #print("Estimated X, Y, psi:", mu_est[0], mu_est[1], mu_est[2])
-            #print("-------------------------------------------------------")
-            
-            #if i == 50: break
+def calc_delta_angle_fromLog(datafile):
+    data = np.genfromtxt(datafile, delimiter=' ')
+    r, c = np.shape(data)
+    delta_angle = np.zeros((r, 3))
+    for i in range(1, r):
+        delta_angle[i] = data[i, 3:6] - data[i - 1, 3:6]
+    delta_angle = delta_angle[1:, :]
+    #delta_angle = np.zeros_like(delta_angle)
+    np.savetxt("delta_angle.txt", delta_angle)
+    return delta_angle
 
 
-    fig = plt.figure(1)
-    ax1 = plt.subplot(aspect='equal', projection='3d')
-    ax1.plot(mu[0,:], mu[1,:], mu[2,:], 'b')
-    ax1.plot(mu_ekf[0,:], mu_ekf[1,:], mu_ekf[2,:], 'r--')
-    mf = m3d.reshape((-1,3))
-    ax1.scatter(mf[:,0], mf[:,1], mf[:,2])
-    ax1.set_xlabel('X')
-    ax1.set_ylabel('Y')
-    ax1.set_zlabel('Z')
-
-    stop = timeit.default_timer()
-    print('Time: ', stop - start)
-
-    plt.show()
-
-
-def runEKF(imu_readings, magnetometer_readings):
-    m3d = np.array([[0.,  0.,  0.]]).reshape(-1)
-
-    dt = 0.01
-    T = np.arange(0, 10, dt)
-    n = int(len(m3d)/3)
-    W = np.zeros((6+3*n, 6+3*n))                                                # process noise covariance. xyz + rpy + 3m
-    W[0:6, 0:6] = dt**2 * 1 * np.eye(6)*50000
-    V = 5*np.eye(4*n)                                                           # measurement covariance
-    V[n:,n:] = 1*np.eye(3*n)                                                    
-
-    # EKF estimation
-    mu_ekf = np.zeros((6+3*n, len(T)))
-    mu_ekf[0:6,0] = np.array([2.1, 0.2, -1.0, -0.5, -5.0, 2.0])
-    # mu_ekf[3:,0] = m + 0.1
-    mu_ekf[6:,0] = np.array([105, 95, 102])
-    init_P = 1*np.eye(6+3*n)                                                    #covariance of initial state
-
-    # initialize EKF SLAM
-    slam = EKF_SLAM(mu_ekf[:,0], init_P, dt, W, V, n)
-    
-    # real state
-    mu = np.zeros((6+3*n, len(T)))
-    mu[0:6,0] = np.array([0, 0, 0, 0, 0, 0])
-    mu[6:,0] = np.array([100, 100, 100])
-
-    y_hist = np.zeros((4*n, len(T)))
-
-    for i, t in enumerate(T):
-        if i > 0:
-            # real dynamics
-            u = [-10*t, 0, 0, 0, 0, 0]
-            #imu_u = imu_readings[i]
-            imu_u = u
-            # u = [0.5, 0.5*np.sin(t*0.5), 0]
-            # u = [0.5, 0.5, 0]
-            mu[:,i] = slam._f(mu[:,i-1], u)
-            
-            # measurements
-            #y = magnetometer_readings[i]                                        # [dist, x_angle, y_angle, z_angle]
-            y = slam._h(mu[:,i]) + np.random.multivariate_normal(np.zeros(4*n), V)*0.01
-
-            y_hist[:,i] = (y-slam._h(slam.mu))
-
-            # apply EKF SLAM
-            mu_est, _ = slam.predict_and_correct(y, imu_u)
-            mu_ekf[:,i] = mu_est
-
-            #print("True      X, Y, psi:", mu[0:3,i])
-            #print("Estimated X, Y, psi:", mu_est[0], mu_est[1], mu_est[2])
-            #print("-------------------------------------------------------")
-            
-            #if i == 50: break
-
-
-    fig = plt.figure(1)
-    ax1 = plt.subplot(aspect='equal', projection='3d')
-    ax1.plot(mu[0,:], mu[1,:], mu[2,:], 'b')
-    ax1.plot(mu_ekf[0,:], mu_ekf[1,:], mu_ekf[2,:], 'r--')
-    mf = m3d.reshape((-1,3))
-    ax1.scatter(mf[:,0], mf[:,1], mf[:,2])
-    ax1.set_xlabel('X')
-    ax1.set_ylabel('Y')
-    ax1.set_zlabel('Z')
-
-    plt.show()
+def get_mag_dist_fromLog(datafile):
+    data = np.genfromtxt(datafile, delimiter=' ')
+    ans = np.hstack((data[:, 6:], np.zeros_like(data[:, 0]).reshape(-1, 1)))
+    ans = ans[1:, :]
+    #ans = np.ones_like(ans)
+    np.savetxt("mag_dist.txt", ans)
+    return ans
 
 
 if __name__ == '__main__':
     start_time = time.time()
     """
     Read from serial
-    """
+    
     clear_data_offset(start_time, 5)
     mean_vals = calc_mean("initial_data_offset.log")
     print(mean_vals)
     odom_meas = print_cali_data(mean_vals, start_time+5, 10)
-    print(odom_meas)
+    #means_ = calc_mean(odom_meas)
+    #print(odom_meas)
     #log_processed_data()
     #plot_processed_data('sensor_data.log')
+    """
+    
 
     """
     Calculate step displacement
     """
-    #x, y, z, d = calcD_fromLog('sensor_data.log', sampling_freq=100)
+    delta_dist = calcD_fromLog('data_log.log', sampling_freq=10)
+    
     #displacement_readings, magnetometer_readings = calcD_fromLog('sensor_data.log', sampling_freq=100)
+    """
+    Calculate step delta angle
+    """
+    delta_angle = calc_delta_angle_fromLog('data_log.log')
+    u = np.hstack((delta_dist, delta_angle))
+    #print(u)
+    """
+    Read Magnet distance from log file
+    """
+    y = get_mag_dist_fromLog('data_log.log')
+    #print(np.shape(y))
 
     """
     Run EKF test on randomly generated test
     """
     #runEKFtest()
-    #runEKF(displacement_readings=0, magnetometer_readings=0) #currently not updating in real time
+    runEKF(u, y, sampling_freq=10) #currently not updating in real time

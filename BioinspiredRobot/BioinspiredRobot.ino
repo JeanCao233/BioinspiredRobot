@@ -3,6 +3,7 @@
 #include <Adafruit_LSM6DSOX.h>
 #include "Adafruit_MLX90393.h"
 #include <MadgwickAHRS.h>
+#include <Wire.h>
 
 // Parameters for filter
 //const float cutoff_freq   = 100.0;  //Cutoff frequency in Hz
@@ -19,6 +20,10 @@ Madgwick madg_filter;
 
 //#define LSM6DSOX_ADDRESS  // LSM6DSOX I2C address
 //#define MLX90393_ADDRESS 0x19 // MLX90393 I2C address
+#define I2C_SDA 18   // Define the pin for the SDA of Wire1
+#define I2C_SCL 19   // Define the pin for the SCL of Wire1
+#define I2C1_SDA 17   // Define the pin for the SDA of Wire1
+#define I2C1_SCL 16   // Define the pin for the SCL of Wire1
 
 // Define functions
 void imu_sensor_setup();
@@ -42,6 +47,7 @@ float imu_mag_mean = 0.0;
 void setup() {
   // Start serial communication
   Serial.begin(19200);
+  Wire.begin();
   //Serial.println("starting setup");
   imu_sensor_setup();
   //Serial.println("imu ready");
@@ -55,13 +61,15 @@ void setup() {
 }
 
 void loop() {
+
+
   unsigned long currentTime = millis(); // Get the current time
 
   float* imu_data = get_imu_data();
   float* mag_data = get_mag_data();
 
-  float* rpy = calc_rpy(imu_data, mag_data);
-  float* accel_without_g = calc_accel_without_g(imu_data, rpy);
+  //float* rpy = calc_rpy(imu_data, mag_data);
+  //float* accel_without_g = calc_accel_without_g(imu_data, rpy);
 
   print_imu_mag(imu_data, mag_data);
   
@@ -148,8 +156,8 @@ float* get_mag_data() {
   static float data[3];
   //float x, y, z;
   
-  data[0] = event.magnetic.x;
-  data[1] = event.magnetic.y;
+  data[0] = - event.magnetic.y;
+  data[1] = event.magnetic.x;
   data[2] = event.magnetic.z;
   return data;
 }
