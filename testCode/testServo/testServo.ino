@@ -36,26 +36,26 @@ void loop() {
     delay(15);                       // waits 15ms for the servo to reach the position
   }
 
-  for (pos1 = 0; pos1 <= 90.0; pos1 += 1.0) { // goes from 0 degrees to 180 degrees
+  for (pos1 = 0; pos1 <= 60.0; pos1 += 1.0) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree
     //Serial.println(pos);
     myservo3.write(pos1);              // tell servo to go to position in variable 'pos'
-    myservo4.write(abs(90 - pos1)+90);              // tell servo to go to position in variable 'pos'
+    myservo4.write(abs(60 - pos1)+120);              // tell servo to go to position in variable 'pos'
   }
 
   for (pos = 80.0; pos >= 0; pos -= 1.0) { // goes from 180 degrees to 0 degrees
     Serial.println(pos);
     myservo1.write(pos);              // tell servo to go to position in variable 'pos'
-    myservo2.write(abs(80 - pos));              // tell servo to go to position in variable 'pos'
+    myservo2.write(abs(80.0 - pos));              // tell servo to go to position in variable 'pos'
     //Serial.println(abs(180 - pos))
     delay(15);                       // waits 15ms for the servo to reach the position
   }
 
-  for (pos1 = 90; pos1 >= 0.0; pos1 -= 1.0) { // goes from 0 degrees to 180 degrees
+  for (pos1 = 60; pos1 >= 0.0; pos1 -= 1.0) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree
     //Serial.println(pos);
     myservo3.write(pos1);              // tell servo to go to position in variable 'pos'
-    myservo4.write(abs(90 - pos1)+90);              // tell servo to go to position in variable 'pos'
+    myservo4.write(abs(60 - pos1)+120);              // tell servo to go to position in variable 'pos'
     //Serial.println(abs(180 - pos));
     delay(15);                       // waits 15ms for the servo to reach the position
   }

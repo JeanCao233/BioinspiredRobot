@@ -140,10 +140,10 @@ def print_cali_data(mean_vals, start_time, end_time):
                 accels = calc_accel_without_g(imu_data, rpy) - mean_vals[0:3]
                 dist, alpha, beta, theta = calc_mag_disp(mag_data)
                 
-                #odom_meas_i = np.hstack((accels, mag_data))
-                #odom_meas_i = np.hstack((accels, np.array([dist, 0, 0])))
+                odom_meas_i = np.hstack((accels, mag_data))
+                odom_meas_i = np.hstack((accels, np.array([dist, 0, 0])))
 
-                #odom_meas = np.append(odom_meas, np.array([odom_meas_i]), axis=0)
+                odom_meas = np.append(odom_meas, np.array([odom_meas_i]), axis=0)
                 log_file.write(f"{float(accels[0]):.5f} {float(accels[1]):.5f} {float(accels[2]):.5f} {float(rpy[0])-mean_vals[3]:.5f} {float(rpy[1])-mean_vals[3]:.5f} {float(rpy[2])-mean_vals[3]:.5f} {float(dist):.5f} {float(alpha):.5f} {float(beta):.5f}\n")
                 log_file.flush()  # Flush buffer to ensure data is written immediately
                 
@@ -215,12 +215,12 @@ def calc_mean(data):
     if isinstance(data, str):
         data = np.genfromtxt(data, delimiter=' ')
 
-    ax = data[:, 0]
-    ay = data[:, 1]
-    az = data[:, 2]
-    gx = data[:, 3]
-    gy = data[:, 4]
-    gz = data[:, 5]
+    ax = data[10:, 0]
+    ay = data[10:, 1]
+    az = data[10:, 2]
+    gx = data[10:, 3]
+    gy = data[10:, 4]
+    gz = data[10:, 5]
 
     ax_mean = np.mean(ax)
     ay_mean = np.mean(ay)
@@ -242,7 +242,7 @@ def calc_mean(data):
     return np.array([ax_mean, ay_mean, az_mean, gx_mean, gy_mean, gz_mean])
 
 
-def calcD_fromLog(datafile, sampling_freq):
+def calcD_fromLog(datafile, sampling_freq, show_fig):
 
     dt = 1.0 / sampling_freq
 
@@ -254,7 +254,7 @@ def calcD_fromLog(datafile, sampling_freq):
     az = imu_data[:, 2]
 
     ax_mean, ay_mean, az_mean = calc_mean(datafile)[0:3]
-    print(ax_mean, ay_mean, az_mean)
+    #print(ax_mean, ay_mean, az_mean)
 
     ax = ax - ax_mean
     ay = ay - ay_mean
@@ -287,14 +287,15 @@ def calcD_fromLog(datafile, sampling_freq):
         y[i2+1] = y[i2] + dy[i2]
         z[i2+1] = z[i2] + dz[i2]
     #z = z*0
-    fig = plt.figure(1)
-    ax1 = plt.subplot(aspect='equal', projection='3d')
-    ax1.plot(x, y, z, 'b--')
-    ax1.scatter(x[0], y[0], z[0])
-    ax1.set_xlabel('X')
-    ax1.set_ylabel('Y')
-    ax1.set_zlabel('Z')
-    #plt.show()
+    if show_fig:
+        fig = plt.figure(1)
+        ax1 = plt.subplot(aspect='equal', projection='3d')
+        ax1.plot(x, y, z, 'b--')
+        ax1.scatter(x[0], y[0], z[0])
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
+        ax1.set_zlabel('Z')
+        plt.show()
     ans = np.hstack((x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)))
     #ans = np.vstack((np.array([[0, 0, 0]]), ans))
     np.savetxt("displacements.txt", ans)
@@ -327,38 +328,38 @@ if __name__ == '__main__':
     start_time = time.time()
     """
     Read from serial
-    
+    """
     clear_data_offset(start_time, 5)
     mean_vals = calc_mean("initial_data_offset.log")
     print(mean_vals)
     odom_meas = print_cali_data(mean_vals, start_time+5, 10)
-    #means_ = calc_mean(odom_meas)
-    #print(odom_meas)
+    means_ = calc_mean(odom_meas)
+    print(means_)
     #log_processed_data()
     #plot_processed_data('sensor_data.log')
-    """
+    
     
 
     """
     Calculate step displacement
     """
-    delta_dist = calcD_fromLog('data_log.log', sampling_freq=10)
+    #delta_dist = calcD_fromLog('data_log.log', sampling_freq=10, show_fig=1)
     
-    #displacement_readings, magnetometer_readings = calcD_fromLog('sensor_data.log', sampling_freq=100)
+                #displacement_readings, magnetometer_readings = calcD_fromLog('sensor_data.log', sampling_freq=100)
     """
-    Calculate step delta angle
+    Calculate step delta angle 
     """
-    delta_angle = calc_delta_angle_fromLog('data_log.log')
-    u = np.hstack((delta_dist, delta_angle))
-    #print(u)
+    #delta_angle = calc_delta_angle_fromLog('data_log.log')
+    #u = np.hstack((delta_dist, delta_angle))
+                #print(u)
     """
     Read Magnet distance from log file
     """
-    y = get_mag_dist_fromLog('data_log.log')
-    #print(np.shape(y))
+    #y = get_mag_dist_fromLog('data_log.log')
+         #print(np.shape(y))
 
     """
     Run EKF test on randomly generated test
     """
-    #runEKFtest()
-    runEKF(u, y, sampling_freq=10) #currently not updating in real time
+                #runEKFtest()
+    #runEKF(u, y, sampling_freq=10) #currently not updating in real time
