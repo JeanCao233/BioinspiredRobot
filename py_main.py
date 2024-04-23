@@ -138,7 +138,7 @@ def print_cali_data(mean_vals, start_time, end_time):
 
                 rpy = calc_rpy(imu_data, mag_data)
                 accels = calc_accel_without_g(imu_data, rpy) - mean_vals[0:3]
-                dist, alpha, beta, theta = calc_mag_disp(mag_data)
+                dist, alpha, beta, theta = calc_mag_disp(mag_data, mean_vals)
                 
                 odom_meas_i = np.hstack((accels, mag_data))
                 odom_meas_i = np.hstack((accels, np.array([dist, 0, 0])))

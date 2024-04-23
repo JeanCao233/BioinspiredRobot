@@ -8,6 +8,7 @@ Servo myservo4;  // create servo object to control a servo
 
 float pos = 0.0;    // variable to store the servo position
 float pos1 = 0.0;    // variable to store the servo position
+const int vibMotorPin = 5;
 
 void setup() {
   Serial.begin(9600);
@@ -25,7 +26,8 @@ void setup() {
 }
 
 void loop() {
-  
+  digitalWrite(motorPin, HIGH);
+  delay(15); // Wait for 1 second
   //delay(1500);
   for (pos = 0; pos <= 80.0; pos += 1.0) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree

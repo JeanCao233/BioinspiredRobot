@@ -147,7 +147,7 @@ float* get_imu_data() {
   data[3] = gyro.gyro.x;
   data[4] = gyro.gyro.y;
   data[5] = gyro.gyro.z;
-  return data;4
+  return data;
 }
 
 float* get_mag_data() {
