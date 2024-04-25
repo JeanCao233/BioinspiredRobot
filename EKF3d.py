@@ -260,6 +260,10 @@ class EKF_SLAM():
 
 
 def runEKFtest():
+    import matplotlib.pyplot as plt
+    import timeit
+    import serial
+
     start = timeit.default_timer()
     
     m3d = np.array([[0.,  0.,  0.],
@@ -346,9 +350,10 @@ def runEKFtest():
 
     plt.show()
 
-def runEKF(imu_readings, magnetometer_readings, sampling_freq):
+def runEKF(imu_readings, magnetometer_readings, sampling_freq, mag_pos):
     import matplotlib.pyplot as plt
-    m3d = np.array([[0.,  0.2,  0.]]).reshape(-1)
+    m3d = mag_pos.reshape(-1)
+    #7.75*0.0254, 26.5*0.0254, 5*0.0254
 
     dt = 1.0 / sampling_freq
 
@@ -367,7 +372,7 @@ def runEKF(imu_readings, magnetometer_readings, sampling_freq):
     mu_ekf = np.zeros((6+3*n, len(T)))
     mu_ekf[0:6,0] = np.array([0, 0, 0, 0, 0, 0])
     # mu_ekf[3:,0] = m + 0.1
-    mu_ekf[6:,0] = np.array([0, 0.2, 0])
+    mu_ekf[6:,0] = mag_pos
     init_P = 1*np.eye(6+3*n)                                                    #covariance of initial state
 
     # initialize EKF SLAM
@@ -419,6 +424,7 @@ def runEKF(imu_readings, magnetometer_readings, sampling_freq):
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_zlabel('Z')
+    ax1.axis('equal')
 
     plt.show()
 
@@ -427,5 +433,5 @@ if __name__ == '__main__':
     import timeit
     import serial
 
-    #runEKFtest()
+    runEKFtest()
     

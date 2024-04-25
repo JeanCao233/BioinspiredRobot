@@ -26,7 +26,7 @@ void setup() {
 }
 
 void loop() {
-  digitalWrite(motorPin, HIGH);
+  //digitalWrite(motorPin, HIGH);
   delay(15); // Wait for 1 second
   //delay(1500);
   for (pos = 0; pos <= 80.0; pos += 1.0) { // goes from 0 degrees to 180 degrees

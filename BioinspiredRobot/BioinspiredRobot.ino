@@ -4,6 +4,23 @@
 #include "Adafruit_MLX90393.h"
 #include <MadgwickAHRS.h>
 #include <Wire.h>
+#include <Servo.h>
+
+
+Adafruit_LSM6DSOX imu_sensor;
+Adafruit_MLX90393 mag_sensor = Adafruit_MLX90393();
+Madgwick madg_filter;
+
+Servo myservo1;  // create servo object to control a servo
+Servo myservo2;  // create servo object to control a servo
+Servo myservo3;  // create servo object to control a servo
+Servo myservo4;  // create servo object to control a servo
+// twelve servo objects can be created on most boards
+
+float pos = 0.0;    // variable to store the servo position
+float pos1 = 0.0;    // variable to store the servo position
+const int vibMotorPin = 5;
+unsigned long currentTime = millis();
 
 // Parameters for filter
 //const float cutoff_freq   = 100.0;  //Cutoff frequency in Hz
@@ -14,9 +31,6 @@
 //float alpha = 0.95;
     
 
-Adafruit_LSM6DSOX imu_sensor;
-Adafruit_MLX90393 mag_sensor = Adafruit_MLX90393();
-Madgwick madg_filter;
 
 //#define LSM6DSOX_ADDRESS  // LSM6DSOX I2C address
 //#define MLX90393_ADDRESS 0x19 // MLX90393 I2C address
@@ -34,6 +48,8 @@ float* calc_accel_without_g(float* imu_data, float* rpy);
 void print_imu_mag(float* imu_data, float* mag_data);
 void print_odometry(float* accel_without_g, float* rpy);
 float average (float* array, int len);
+void motors_setup();
+void run_motors();
 
 
 unsigned long startTime = 0;
@@ -53,6 +69,7 @@ void setup() {
   //Serial.println("imu ready");
   mag_sensor_setup();
   //Serial.println("starting timer");
+  motors_setup();
   
 
   startTime = millis(); // Record the start time
@@ -62,16 +79,16 @@ void setup() {
 
 void loop() {
 
-
-  unsigned long currentTime = millis(); // Get the current time
+  //unsigned long currentTime = millis(); // Get the current time
+  //run_motors();
 
   float* imu_data = get_imu_data();
   float* mag_data = get_mag_data();
+  print_imu_mag(imu_data, mag_data);
 
   //float* rpy = calc_rpy(imu_data, mag_data);
   //float* accel_without_g = calc_accel_without_g(imu_data, rpy);
 
-  print_imu_mag(imu_data, mag_data);
   
   //print_odometry(accel_without_g, rpy);
 
@@ -101,7 +118,7 @@ void loop() {
 
 
   //print_accel_mag(imu_data, mag_data);
-  iter = iter + 1;
+  //iter = iter + 1;
   delay(100); // Loop time will approx. match the sampling time.
 }
 
@@ -225,6 +242,72 @@ void print_odometry(float* accel_without_g, float* rpy) {
   Serial.print(" ");
   Serial.print(rpy[2]);
   Serial.println();
+}
+
+void motors_setup() {
+  myservo1.attach(2);  // attaches the servo on pin 3 to the servo object
+  myservo2.attach(3);  // attaches the servo on pin 2 to the servo object
+  myservo3.attach(4);
+  myservo4.attach(5);
+  //erial.println("Starting");
+  myservo1.write(0);
+  myservo2.write(80);
+  myservo3.write(0);
+  myservo4.write(180);
+}
+
+void run_motors() {
+  //digitalWrite(motorPin, HIGH);
+  //delay(15); // Wait for 1 second
+  
+  //delay(1500);
+  for (pos = 0; pos <= 80.0; pos += 8.0) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    //Serial.println(pos);
+    float* imu_data = get_imu_data();
+    float* mag_data = get_mag_data();
+    print_imu_mag(imu_data, mag_data);
+    myservo1.write(pos);              // tell servo to go to position in variable 'pos'
+    myservo2.write(abs(80 - pos));              // tell servo to go to position in variable 'pos'
+    //Serial.println(abs(180 - pos));
+    //delay(35);                       // waits 15ms for the servo to reach the position
+  }
+
+  for (pos1 = 0; pos1 <= 80.0; pos1 += 8.0) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    //Serial.println(pos);
+    float* imu_data = get_imu_data();
+    float* mag_data = get_mag_data();
+    print_imu_mag(imu_data, mag_data);
+    myservo4.write(pos1);              // tell servo to go to position in variable 'pos'
+    myservo3.write(abs(80 - pos1)+80);              // tell servo to go to position in variable 'pos'
+    delay(35);
+  }
+
+  for (pos = 80.0; pos >= 0; pos -= 8.0) { // goes from 180 degrees to 0 degrees
+    float* imu_data = get_imu_data();
+    float* mag_data = get_mag_data();
+    print_imu_mag(imu_data, mag_data);
+    //Serial.println(pos);
+    myservo1.write(pos);              // tell servo to go to position in variable 'pos'
+    myservo2.write(abs(80.0 - pos));              // tell servo to go to position in variable 'pos'
+    //Serial.println(abs(180 - pos))
+    //delay(35);                       // waits 15ms for the servo to reach the position
+  }
+
+  for (pos1 = 80; pos1 >= 0.0; pos1 -= 8.0) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    //Serial.println(pos);
+    float* imu_data = get_imu_data();
+    float* mag_data = get_mag_data();
+    print_imu_mag(imu_data, mag_data);
+    myservo4.write(pos1);              // tell servo to go to position in variable 'pos'
+    myservo3.write(abs(80 - pos1)+80);              // tell servo to go to position in variable 'pos'
+    //Serial.println(abs(180 - pos));
+    //delay(35);                       // waits 15ms for the servo to reach the position
+  }
+  //delay(150);
+  //Serial.println("testing3");
 }
 
 
